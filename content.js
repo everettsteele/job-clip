@@ -1,33 +1,44 @@
 (function () {
   'use strict';
 
-  let lastInjectedUrl = null;
+  var BTN_ID = 'snag-btn';
+  var TOAST_ID = 'snag-toast';
+
+  function isJobPage() {
+    var url = window.location.href;
+    if (url.includes('linkedin.com/jobs/view/')) return true;
+    if (url.includes('linkedin.com/jobs/') &&
+        (document.querySelector('.jobs-details') ||
+         document.querySelector('.job-details-jobs-unified-top-card'))) return true;
+    return false;
+  }
 
   function extractJobData() {
-    const titleEl = document.querySelector([
-      '.job-details-jobs-unified-top-card__job-title h1',
-      '.jobs-unified-top-card__job-title h1',
-      '.t-24.t-bold.inline',
-      'h1'
-    ].join(','));
+    var titleEl =
+      document.querySelector('.job-details-jobs-unified-top-card__job-title h1') ||
+      document.querySelector('.jobs-unified-top-card__job-title h1') ||
+      document.querySelector('.jobs-details-top-card__job-title') ||
+      document.querySelector('.t-24.t-bold.inline') ||
+      document.querySelector('.jobs-details h1') ||
+      document.querySelector('.job-details h1') ||
+      document.querySelector('h1');
 
-    const companyEl = document.querySelector([
-      '.job-details-jobs-unified-top-card__company-name a',
-      '.jobs-unified-top-card__company-name a',
-      '.jobs-unified-top-card__subtitle-primary-grouping a'
-    ].join(','));
+    var companyEl =
+      document.querySelector('.job-details-jobs-unified-top-card__company-name a') ||
+      document.querySelector('.jobs-unified-top-card__company-name a') ||
+      document.querySelector('.jobs-unified-top-card__subtitle-primary-grouping a') ||
+      document.querySelector('[data-tracking-control-name="public_jobs_topcard-org-name"]');
 
-    const salaryEl = document.querySelector([
-      '.job-details-jobs-unified-top-card__salary-info',
-      '.jobs-unified-top-card__salary-info',
-      '[data-test-salary-insight]'
-    ].join(','));
+    var salaryEl =
+      document.querySelector('.job-details-jobs-unified-top-card__salary-info') ||
+      document.querySelector('.jobs-unified-top-card__salary-info') ||
+      document.querySelector('.compensation__salary');
 
-    const descEl = document.querySelector([
-      '.jobs-description__content',
-      '.jobs-description-content__text',
-      '#job-details'
-    ].join(','));
+    var descEl =
+      document.querySelector('.jobs-description__content') ||
+      document.querySelector('.jobs-description-content__text') ||
+      document.querySelector('#job-details') ||
+      document.querySelector('.jobs-details__main-content');
 
     return {
       title: titleEl ? titleEl.textContent.trim() : 'Unknown Title',
@@ -40,127 +51,131 @@
   }
 
   function showToast(message, color) {
-    var existing = document.getElementById('job-clip-toast');
+    var existing = document.getElementById(TOAST_ID);
     if (existing) existing.remove();
+
     var toast = document.createElement('div');
-    toast.id = 'job-clip-toast';
+    toast.id = TOAST_ID;
     toast.textContent = message;
     toast.style.cssText = [
       'position:fixed',
-      'bottom:24px',
+      'bottom:84px',
       'right:24px',
       'background:' + color,
       'color:white',
-      'padding:12px 20px',
+      'padding:10px 16px',
       'border-radius:8px',
-      'font-size:14px',
+      'font-size:13px',
       'font-weight:600',
       'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
-      'z-index:99999',
-      'box-shadow:0 4px 12px rgba(0,0,0,0.2)',
-      'transition:opacity 0.3s'
+      'z-index:100000',
+      'box-shadow:0 4px 16px rgba(0,0,0,0.25)',
+      'max-width:300px',
+      'opacity:1',
+      'transition:opacity 0.4s ease',
+      'pointer-events:none'
     ].join(';');
     document.body.appendChild(toast);
-    setTimeout(function() {
+
+    setTimeout(function () {
       toast.style.opacity = '0';
-      setTimeout(function() { toast.remove(); }, 300);
-    }, 2500);
+      setTimeout(function () { if (toast.parentNode) toast.remove(); }, 400);
+    }, 2800);
   }
 
-  function injectButton() {
-    var currentUrl = window.location.href;
-    if (lastInjectedUrl === currentUrl && document.getElementById('job-clip-btn')) return;
-
-    var existing = document.getElementById('job-clip-btn');
-    if (existing) existing.remove();
-
-    // Try multiple container selectors — LinkedIn updates these often
-    var selectors = [
-      '.jobs-apply-button--top-card',
-      '.job-details-jobs-unified-top-card__container--two-pane .mt4',
-      '.jobs-unified-top-card__content--two-pane .mt4',
-      '.jobs-s-apply',
-      '.jobs-apply-button'
-    ];
-
-    var container = null;
-    for (var i = 0; i < selectors.length; i++) {
-      container = document.querySelector(selectors[i]);
-      if (container) break;
-    }
-
-    if (!container) return;
-
+  function createButton() {
     var btn = document.createElement('button');
-    btn.id = 'job-clip-btn';
-    btn.textContent = '\uD83D\uDCCE Clip Job';
+    btn.id = BTN_ID;
+    btn.innerHTML = '\u26A1 Snag';
     btn.style.cssText = [
-      'margin-left:8px',
-      'padding:0 16px',
-      'height:40px',
+      'position:fixed',
+      'bottom:24px',
+      'right:24px',
+      'z-index:99999',
       'background:#0a66c2',
       'color:white',
       'border:none',
-      'border-radius:20px',
-      'font-size:14px',
-      'font-weight:600',
+      'border-radius:24px',
+      'padding:0 22px',
+      'height:46px',
+      'font-size:15px',
+      'font-weight:700',
       'cursor:pointer',
       'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
-      'white-space:nowrap',
-      'vertical-align:middle'
+      'box-shadow:0 4px 18px rgba(10,102,194,0.5)',
+      'display:flex',
+      'align-items:center',
+      'gap:6px',
+      'letter-spacing:-0.01em',
+      'transition:transform 0.15s ease,box-shadow 0.15s ease,background 0.15s ease'
     ].join(';');
 
-    btn.addEventListener('mouseenter', function() { btn.style.background = '#004182'; });
-    btn.addEventListener('mouseleave', function() { btn.style.background = '#0a66c2'; });
+    btn.addEventListener('mouseenter', function () {
+      btn.style.transform = 'translateY(-2px)';
+      btn.style.boxShadow = '0 6px 22px rgba(10,102,194,0.6)';
+      btn.style.background = '#004182';
+    });
+    btn.addEventListener('mouseleave', function () {
+      btn.style.transform = '';
+      btn.style.boxShadow = '0 4px 18px rgba(10,102,194,0.5)';
+      btn.style.background = '#0a66c2';
+    });
 
-    btn.addEventListener('click', function() {
-      btn.textContent = '\u23F3 Clipping...';
+    btn.addEventListener('click', function () {
+      btn.innerHTML = '\u23F3 Snagging...';
       btn.disabled = true;
+      btn.style.background = '#555';
+      btn.style.boxShadow = 'none';
+      btn.style.transform = '';
 
       var jobData = extractJobData();
 
-      chrome.runtime.sendMessage({ type: 'CLIP_JOB', data: jobData }, function(response) {
+      chrome.runtime.sendMessage({ type: 'CLIP_JOB', data: jobData }, function (response) {
         if (response && response.success) {
-          btn.textContent = '\u2705 Clipped!';
+          btn.innerHTML = '\u2705 Snagged!';
           btn.style.background = '#057642';
-          showToast('\u2705 Clipped: ' + jobData.company + ' \u2014 ' + jobData.title, '#057642');
+          btn.style.boxShadow = '0 4px 18px rgba(5,118,66,0.5)';
+          showToast('\u2705 ' + jobData.company + ' \u2014 ' + jobData.title, '#057642');
         } else {
-          btn.textContent = '\u274C Error';
+          btn.innerHTML = '\u274C Failed';
           btn.style.background = '#cc0000';
-          var errMsg = (response && response.error) ? response.error : 'Unknown error';
+          btn.style.boxShadow = '0 4px 18px rgba(204,0,0,0.4)';
+          var errMsg = (response && response.error) ? response.error : 'Check extension settings.';
           showToast('\u274C ' + errMsg, '#cc0000');
         }
-        setTimeout(function() {
-          btn.textContent = '\uD83D\uDCCE Clip Job';
+        setTimeout(function () {
+          btn.innerHTML = '\u26A1 Snag';
           btn.style.background = '#0a66c2';
+          btn.style.boxShadow = '0 4px 18px rgba(10,102,194,0.5)';
           btn.disabled = false;
         }, 2500);
       });
     });
 
-    // Insert after first button, or append
-    var firstBtn = container.querySelector('button');
-    if (firstBtn) {
-      firstBtn.insertAdjacentElement('afterend', btn);
-    } else {
-      container.appendChild(btn);
-    }
+    return btn;
+  }
 
-    lastInjectedUrl = currentUrl;
+  function updateVisibility() {
+    var btn = document.getElementById(BTN_ID);
+    var onJob = isJobPage();
+
+    if (onJob && !btn) {
+      document.body.appendChild(createButton());
+    } else if (!onJob && btn) {
+      btn.remove();
+    }
   }
 
   // Watch for LinkedIn SPA navigation
   var lastUrl = window.location.href;
-  var observer = new MutationObserver(function() {
+  var observer = new MutationObserver(function () {
     if (window.location.href !== lastUrl) {
       lastUrl = window.location.href;
-      setTimeout(injectButton, 1200);
-    } else if (!document.getElementById('job-clip-btn') && window.location.href.includes('/jobs/')) {
-      injectButton();
+      setTimeout(updateVisibility, 800);
     }
   });
 
   observer.observe(document.body, { childList: true, subtree: true });
-  setTimeout(injectButton, 1500);
+  setTimeout(updateVisibility, 1000);
 
 })();

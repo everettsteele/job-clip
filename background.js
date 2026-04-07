@@ -1,7 +1,7 @@
-chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
+chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   if (message.type === 'CLIP_JOB') {
     clipJob(message.data).then(sendResponse);
-    return true; // keep channel open for async response
+    return true;
   }
 });
 
@@ -10,7 +10,7 @@ async function clipJob(job) {
     const { notionToken, notionPageId } = await chrome.storage.sync.get(['notionToken', 'notionPageId']);
 
     if (!notionToken || !notionPageId) {
-      return { success: false, error: 'Not configured. Right-click the extension icon and choose Options.' };
+      return { success: false, error: 'Not configured. Open Snag settings.' };
     }
 
     const pageTitle = job.company + ' \u2014 ' + job.title;
@@ -38,7 +38,7 @@ async function clipJob(job) {
       }
     });
 
-    children.push(bullet('Clipped: ' + dateStr));
+    children.push(bullet('Snagged: ' + dateStr));
     children.push(divider());
     children.push(heading2('Job Description'));
     children.push(para(job.description || 'No description captured.'));
@@ -79,7 +79,6 @@ async function clipJob(job) {
       return { success: false, error: err.message || 'Notion API error ' + res.status };
     }
 
-    // Update badge count
     const data = await chrome.storage.local.get('clipCount');
     const newCount = (data.clipCount || 0) + 1;
     await chrome.storage.local.set({ clipCount: newCount });
@@ -93,7 +92,6 @@ async function clipJob(job) {
   }
 }
 
-// Block helpers
 function heading2(content) {
   return { object: 'block', type: 'heading_2', heading_2: { rich_text: [{ type: 'text', text: { content } }] } };
 }

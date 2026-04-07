@@ -13,38 +13,45 @@
       color: #1a1a1a;
     }
     .header { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
-    .logo { width: 24px; height: 24px; background: #0a66c2; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
-    h1 { font-size: 15px; font-weight: 700; margin: 0; }
+    .logo {
+      width: 28px; height: 28px;
+      background: #0a66c2;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; line-height: 1;
+    }
+    h1 { font-size: 16px; font-weight: 700; margin: 0; }
     .stat { margin-bottom: 14px; }
     .count { font-size: 36px; font-weight: 700; color: #0a66c2; line-height: 1; margin-bottom: 2px; }
     .label { font-size: 12px; color: #888; }
     hr { border: none; border-top: 1px solid #eee; margin: 14px 0; }
     .actions { display: flex; flex-direction: column; gap: 8px; }
     a {
-      display: block;
-      text-align: center;
-      padding: 9px 0;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 600;
-      text-decoration: none;
-      cursor: pointer;
+      display: block; text-align: center;
+      padding: 9px 0; border-radius: 6px;
+      font-size: 13px; font-weight: 600;
+      text-decoration: none; cursor: pointer;
     }
     .primary { background: #0a66c2; color: white; }
     .secondary { background: #f0f0f0; color: #333; }
     a:hover { opacity: 0.85; }
-    .not-configured { font-size: 12px; color: #e8a400; background: #fff8e6; border: 1px solid #e8a400; border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; display: none; }
+    .warning {
+      font-size: 12px; color: #b45309;
+      background: #fffbeb; border: 1px solid #fcd34d;
+      border-radius: 6px; padding: 8px 10px;
+      margin-bottom: 10px; display: none;
+    }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="logo">&#128204;</div>
-    <h1>Job Clip</h1>
+    <div class="logo">&#x26A1;</div>
+    <h1>Snag</h1>
   </div>
-  <div class="not-configured" id="warning">Configure Notion in Settings before clipping.</div>
+  <div class="warning" id="warning">Configure Notion in Settings before snagging.</div>
   <div class="stat">
     <div class="count" id="count">0</div>
-    <div class="label">jobs clipped</div>
+    <div class="label">jobs snagged</div>
   </div>
   <hr>
   <div class="actions">
