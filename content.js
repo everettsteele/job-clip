@@ -56,11 +56,11 @@
     var toastHost = document.createElement('div');
     toastHost.id = TOAST_ID;
     toastHost.style.cssText = [
+      'all:initial',
       'position:fixed',
-      'bottom:84px',
+      'bottom:90px',
       'right:24px',
       'z-index:2147483647',
-      'all:initial',
       'display:block'
     ].join(';');
 
@@ -83,7 +83,6 @@
       'transition:opacity 0.4s ease'
     ].join(';');
     shadow.appendChild(toast);
-
     document.documentElement.appendChild(toastHost);
 
     setTimeout(function () {
@@ -93,24 +92,18 @@
   }
 
   function createHost() {
-    // Outer host sits on <html>, not <body>, to escape any LinkedIn stacking context
     var host = document.createElement('div');
     host.id = HOST_ID;
-
-    // Reset ALL inherited styles — LinkedIn cannot touch anything inside
     host.style.cssText = [
       'all:initial',
       'position:fixed',
-      'bottom:24px',
+      'bottom:80px',
       'right:24px',
       'z-index:2147483647',
       'display:block'
     ].join(';');
 
     var shadow = host.attachShadow({ mode: 'open' });
-
-    var btn = document.createElement('button');
-    btn.id = 'snag-btn';
 
     var style = document.createElement('style');
     style.textContent = [
@@ -136,21 +129,21 @@
       '  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;',
       '}',
       '#snag-btn:hover {',
-      '  background: #004182;',
+      '  background: #004182 !important;',
       '  transform: translateY(-2px);',
       '  box-shadow: 0 6px 22px rgba(10,102,194,0.65);',
       '}',
       '#snag-btn:disabled { cursor: default; }'
     ].join('\n');
 
+    var btn = document.createElement('button');
+    btn.id = 'snag-btn';
     btn.textContent = '\u26A1 Snag';
 
     btn.addEventListener('click', function () {
       btn.textContent = '\u23F3 Snagging...';
       btn.disabled = true;
-      btn.style.background = '#555';
-      btn.style.boxShadow = 'none';
-      btn.style.transform = 'none';
+      btn.style.cssText = 'background:#555;box-shadow:none;';
 
       var jobData = extractJobData();
       console.log('[Snag] snagging:', jobData.company, '-', jobData.title);
@@ -160,26 +153,23 @@
           console.error('[Snag] runtime error:', chrome.runtime.lastError.message);
           showToast('\u274C Extension error. Try reloading.', '#cc0000');
           btn.textContent = '\u26A1 Snag';
-          btn.style.background = '';
-          btn.style.boxShadow = '';
+          btn.style.cssText = '';
           btn.disabled = false;
           return;
         }
         if (response && response.success) {
           btn.textContent = '\u2705 Snagged!';
-          btn.style.background = '#057642';
-          btn.style.boxShadow = '0 4px 18px rgba(5,118,66,0.5)';
+          btn.style.cssText = 'background:#057642;box-shadow:0 4px 18px rgba(5,118,66,0.5);';
           showToast('\u2705 ' + jobData.company + ' \u2014 ' + jobData.title, '#057642');
         } else {
           btn.textContent = '\u274C Failed';
-          btn.style.background = '#cc0000';
+          btn.style.cssText = 'background:#cc0000;';
           var errMsg = (response && response.error) ? response.error : 'Check Settings.';
           showToast('\u274C ' + errMsg, '#cc0000');
         }
         setTimeout(function () {
           btn.textContent = '\u26A1 Snag';
-          btn.style.background = '';
-          btn.style.boxShadow = '';
+          btn.style.cssText = '';
           btn.disabled = false;
         }, 2500);
       });
@@ -203,14 +193,12 @@
     }
   }
 
-  // Poll every 500ms for first 10 seconds
   var pollCount = 0;
   var interval = setInterval(function () {
     inject();
     if (++pollCount >= 20) clearInterval(interval);
   }, 500);
 
-  // Watch for SPA navigation
   var lastUrl = window.location.href;
   try {
     new MutationObserver(function () {
