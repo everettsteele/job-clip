@@ -3,14 +3,15 @@
 
   var BTN_ID = 'snag-btn';
   var TOAST_ID = 'snag-toast';
+  var INTERVAL_ID = null;
 
-  // Show on any LinkedIn jobs page — split pane, search, collections, view
+  console.log('[Snag] content script loaded on', window.location.href);
+
   function isJobPage() {
     return window.location.href.includes('linkedin.com/jobs');
   }
 
   function extractJobData() {
-    // Title: try job detail panel first, fall back to any visible h1
     var titleEl =
       document.querySelector('.job-details-jobs-unified-top-card__job-title h1') ||
       document.querySelector('.jobs-unified-top-card__job-title h1') ||
@@ -20,7 +21,6 @@
       document.querySelector('.jobs-details h1') ||
       document.querySelector('h1');
 
-    // Company: try anchors in the top card, then any visible company link
     var companyEl =
       document.querySelector('.job-details-jobs-unified-top-card__company-name a') ||
       document.querySelector('.jobs-unified-top-card__company-name a') ||
@@ -32,15 +32,13 @@
     var salaryEl =
       document.querySelector('.job-details-jobs-unified-top-card__salary-info') ||
       document.querySelector('.jobs-unified-top-card__salary-info') ||
-      document.querySelector('.compensation__salary') ||
-      document.querySelector('[class*="salary"]');
+      document.querySelector('.compensation__salary');
 
     var descEl =
       document.querySelector('.jobs-description__content') ||
       document.querySelector('.jobs-description-content__text') ||
       document.querySelector('#job-details') ||
-      document.querySelector('.jobs-details__main-content') ||
-      document.querySelector('[class*="description"]');
+      document.querySelector('.jobs-details__main-content');
 
     return {
       title: titleEl ? titleEl.textContent.trim() : 'Unknown Title',
@@ -55,30 +53,20 @@
   function showToast(message, color) {
     var existing = document.getElementById(TOAST_ID);
     if (existing) existing.remove();
-
     var toast = document.createElement('div');
     toast.id = TOAST_ID;
     toast.textContent = message;
     toast.style.cssText = [
-      'position:fixed',
-      'bottom:84px',
-      'right:24px',
-      'background:' + color,
-      'color:white',
-      'padding:10px 16px',
-      'border-radius:8px',
-      'font-size:13px',
-      'font-weight:600',
+      'position:fixed', 'bottom:84px', 'right:24px',
+      'background:' + color, 'color:white',
+      'padding:10px 16px', 'border-radius:8px',
+      'font-size:13px', 'font-weight:600',
       'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
-      'z-index:100000',
-      'box-shadow:0 4px 16px rgba(0,0,0,0.25)',
-      'max-width:300px',
-      'opacity:1',
-      'transition:opacity 0.4s ease',
+      'z-index:2147483647', 'box-shadow:0 4px 16px rgba(0,0,0,0.25)',
+      'max-width:300px', 'opacity:1', 'transition:opacity 0.4s ease',
       'pointer-events:none'
     ].join(';');
     document.body.appendChild(toast);
-
     setTimeout(function () {
       toast.style.opacity = '0';
       setTimeout(function () { if (toast.parentNode) toast.remove(); }, 400);
@@ -88,33 +76,25 @@
   function createButton() {
     var btn = document.createElement('button');
     btn.id = BTN_ID;
-    btn.innerHTML = '\u26A1 Snag';
+    btn.innerHTML = '&#x26A1; Snag';
     btn.style.cssText = [
-      'position:fixed',
-      'bottom:24px',
-      'right:24px',
+      'position:fixed', 'bottom:24px', 'right:24px',
       'z-index:2147483647',
-      'background:#0a66c2',
-      'color:white',
-      'border:none',
-      'border-radius:24px',
-      'padding:0 22px',
-      'height:46px',
-      'font-size:15px',
-      'font-weight:700',
-      'cursor:pointer',
+      'background:#0a66c2', 'color:#ffffff',
+      'border:none', 'border-radius:24px',
+      'padding:0 22px', 'height:46px',
+      'font-size:15px', 'font-weight:700', 'cursor:pointer',
       'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
       'box-shadow:0 4px 18px rgba(10,102,194,0.5)',
-      'display:flex',
-      'align-items:center',
-      'gap:6px',
+      'display:flex', 'align-items:center', 'gap:6px',
       'letter-spacing:-0.01em',
-      'transition:transform 0.15s ease,box-shadow 0.15s ease,background 0.15s ease'
+      'transition:transform 0.15s ease,box-shadow 0.15s ease,background 0.15s ease',
+      'line-height:1'
     ].join(';');
 
     btn.addEventListener('mouseenter', function () {
       btn.style.transform = 'translateY(-2px)';
-      btn.style.boxShadow = '0 6px 22px rgba(10,102,194,0.6)';
+      btn.style.boxShadow = '0 6px 22px rgba(10,102,194,0.65)';
       btn.style.background = '#004182';
     });
     btn.addEventListener('mouseleave', function () {
@@ -124,29 +104,37 @@
     });
 
     btn.addEventListener('click', function () {
-      btn.innerHTML = '\u23F3 Snagging...';
+      btn.innerHTML = '&#x23F3; Snagging...';
       btn.disabled = true;
       btn.style.background = '#555';
       btn.style.boxShadow = 'none';
-      btn.style.transform = '';
 
       var jobData = extractJobData();
+      console.log('[Snag] snagging:', jobData.company, '-', jobData.title);
 
       chrome.runtime.sendMessage({ type: 'CLIP_JOB', data: jobData }, function (response) {
+        if (chrome.runtime.lastError) {
+          console.error('[Snag] runtime error:', chrome.runtime.lastError.message);
+          showToast('\u274C Extension error. Try reloading.', '#cc0000');
+          btn.innerHTML = '&#x26A1; Snag';
+          btn.style.background = '#0a66c2';
+          btn.style.boxShadow = '0 4px 18px rgba(10,102,194,0.5)';
+          btn.disabled = false;
+          return;
+        }
         if (response && response.success) {
-          btn.innerHTML = '\u2705 Snagged!';
+          btn.innerHTML = '&#x2705; Snagged!';
           btn.style.background = '#057642';
           btn.style.boxShadow = '0 4px 18px rgba(5,118,66,0.5)';
           showToast('\u2705 ' + jobData.company + ' \u2014 ' + jobData.title, '#057642');
         } else {
-          btn.innerHTML = '\u274C Failed';
+          btn.innerHTML = '&#x274C; Failed';
           btn.style.background = '#cc0000';
-          btn.style.boxShadow = '0 4px 18px rgba(204,0,0,0.4)';
-          var errMsg = (response && response.error) ? response.error : 'Check extension settings.';
+          var errMsg = (response && response.error) ? response.error : 'Check Settings.';
           showToast('\u274C ' + errMsg, '#cc0000');
         }
         setTimeout(function () {
-          btn.innerHTML = '\u26A1 Snag';
+          btn.innerHTML = '&#x26A1; Snag';
           btn.style.background = '#0a66c2';
           btn.style.boxShadow = '0 4px 18px rgba(10,102,194,0.5)';
           btn.disabled = false;
@@ -157,31 +145,43 @@
     return btn;
   }
 
-  function updateVisibility() {
-    var btn = document.getElementById(BTN_ID);
-    var onJob = isJobPage();
-
-    if (onJob && !btn) {
+  function inject() {
+    if (!document.body) return;
+    if (!isJobPage()) {
+      var existing = document.getElementById(BTN_ID);
+      if (existing) existing.remove();
+      return;
+    }
+    if (!document.getElementById(BTN_ID)) {
+      console.log('[Snag] injecting button');
       document.body.appendChild(createButton());
-    } else if (!onJob && btn) {
-      btn.remove();
     }
   }
 
-  // Watch for LinkedIn SPA navigation
-  var lastUrl = window.location.href;
-  var observer = new MutationObserver(function () {
-    if (window.location.href !== lastUrl) {
-      lastUrl = window.location.href;
-      setTimeout(updateVisibility, 800);
+  // Poll every 500ms for 10 seconds on initial load, then hand off to URL observer
+  var pollCount = 0;
+  INTERVAL_ID = setInterval(function () {
+    inject();
+    pollCount++;
+    if (pollCount >= 20) {
+      clearInterval(INTERVAL_ID);
     }
-  });
+  }, 500);
 
-  observer.observe(document.body, { childList: true, subtree: true });
-
-  // Initial inject — retry a few times in case page is still loading
-  setTimeout(updateVisibility, 500);
-  setTimeout(updateVisibility, 1500);
-  setTimeout(updateVisibility, 3000);
+  // Watch for SPA navigation
+  var lastUrl = window.location.href;
+  try {
+    var observer = new MutationObserver(function () {
+      if (window.location.href !== lastUrl) {
+        lastUrl = window.location.href;
+        console.log('[Snag] URL changed to', lastUrl);
+        setTimeout(inject, 800);
+        setTimeout(inject, 1800);
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  } catch (e) {
+    console.error('[Snag] observer error:', e);
+  }
 
 })();
