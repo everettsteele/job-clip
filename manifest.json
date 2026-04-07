@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Snag",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Snag LinkedIn job listings into your Notion queue with one click.",
   "permissions": ["storage"],
   "host_permissions": [
-    "https://www.linkedin.com/*",
+    "*://*.linkedin.com/*",
     "https://api.notion.com/*"
   ],
   "background": {
@@ -13,7 +13,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.linkedin.com/*"],
+      "matches": ["*://*.linkedin.com/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
