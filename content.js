@@ -1,9 +1,8 @@
 (function () {
   'use strict';
 
-  var BTN_ID = 'snag-btn';
-  var TOAST_ID = 'snag-toast';
-  var INTERVAL_ID = null;
+  var HOST_ID = 'snag-host';
+  var TOAST_ID = 'snag-toast-host';
 
   console.log('[Snag] content script loaded on', window.location.href);
 
@@ -53,61 +52,105 @@
   function showToast(message, color) {
     var existing = document.getElementById(TOAST_ID);
     if (existing) existing.remove();
+
+    var toastHost = document.createElement('div');
+    toastHost.id = TOAST_ID;
+    toastHost.style.cssText = [
+      'position:fixed',
+      'bottom:84px',
+      'right:24px',
+      'z-index:2147483647',
+      'all:initial',
+      'display:block'
+    ].join(';');
+
+    var shadow = toastHost.attachShadow({ mode: 'open' });
     var toast = document.createElement('div');
-    toast.id = TOAST_ID;
     toast.textContent = message;
     toast.style.cssText = [
-      'position:fixed', 'bottom:84px', 'right:24px',
-      'background:' + color, 'color:white',
-      'padding:10px 16px', 'border-radius:8px',
-      'font-size:13px', 'font-weight:600',
+      'background:' + color,
+      'color:white',
+      'padding:10px 16px',
+      'border-radius:8px',
+      'font-size:13px',
+      'font-weight:600',
       'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
-      'z-index:2147483647', 'box-shadow:0 4px 16px rgba(0,0,0,0.25)',
-      'max-width:300px', 'opacity:1', 'transition:opacity 0.4s ease',
-      'pointer-events:none'
+      'box-shadow:0 4px 16px rgba(0,0,0,0.25)',
+      'max-width:300px',
+      'white-space:nowrap',
+      'pointer-events:none',
+      'opacity:1',
+      'transition:opacity 0.4s ease'
     ].join(';');
-    document.body.appendChild(toast);
+    shadow.appendChild(toast);
+
+    document.documentElement.appendChild(toastHost);
+
     setTimeout(function () {
       toast.style.opacity = '0';
-      setTimeout(function () { if (toast.parentNode) toast.remove(); }, 400);
+      setTimeout(function () { if (toastHost.parentNode) toastHost.remove(); }, 400);
     }, 2800);
   }
 
-  function createButton() {
-    var btn = document.createElement('button');
-    btn.id = BTN_ID;
-    btn.innerHTML = '&#x26A1; Snag';
-    btn.style.cssText = [
-      'position:fixed', 'bottom:24px', 'right:24px',
+  function createHost() {
+    // Outer host sits on <html>, not <body>, to escape any LinkedIn stacking context
+    var host = document.createElement('div');
+    host.id = HOST_ID;
+
+    // Reset ALL inherited styles — LinkedIn cannot touch anything inside
+    host.style.cssText = [
+      'all:initial',
+      'position:fixed',
+      'bottom:24px',
+      'right:24px',
       'z-index:2147483647',
-      'background:#0a66c2', 'color:#ffffff',
-      'border:none', 'border-radius:24px',
-      'padding:0 22px', 'height:46px',
-      'font-size:15px', 'font-weight:700', 'cursor:pointer',
-      'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
-      'box-shadow:0 4px 18px rgba(10,102,194,0.5)',
-      'display:flex', 'align-items:center', 'gap:6px',
-      'letter-spacing:-0.01em',
-      'transition:transform 0.15s ease,box-shadow 0.15s ease,background 0.15s ease',
-      'line-height:1'
+      'display:block'
     ].join(';');
 
-    btn.addEventListener('mouseenter', function () {
-      btn.style.transform = 'translateY(-2px)';
-      btn.style.boxShadow = '0 6px 22px rgba(10,102,194,0.65)';
-      btn.style.background = '#004182';
-    });
-    btn.addEventListener('mouseleave', function () {
-      btn.style.transform = '';
-      btn.style.boxShadow = '0 4px 18px rgba(10,102,194,0.5)';
-      btn.style.background = '#0a66c2';
-    });
+    var shadow = host.attachShadow({ mode: 'open' });
+
+    var btn = document.createElement('button');
+    btn.id = 'snag-btn';
+
+    var style = document.createElement('style');
+    style.textContent = [
+      '#snag-btn {',
+      '  all: initial;',
+      '  display: flex;',
+      '  align-items: center;',
+      '  gap: 6px;',
+      '  background: #0a66c2;',
+      '  color: #ffffff;',
+      '  border: none;',
+      '  border-radius: 24px;',
+      '  padding: 0 22px;',
+      '  height: 46px;',
+      '  font-size: 15px;',
+      '  font-weight: 700;',
+      '  cursor: pointer;',
+      '  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;',
+      '  box-shadow: 0 4px 18px rgba(10,102,194,0.5);',
+      '  letter-spacing: -0.01em;',
+      '  line-height: 1;',
+      '  white-space: nowrap;',
+      '  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;',
+      '}',
+      '#snag-btn:hover {',
+      '  background: #004182;',
+      '  transform: translateY(-2px);',
+      '  box-shadow: 0 6px 22px rgba(10,102,194,0.65);',
+      '}',
+      '#snag-btn:disabled { cursor: default; }'
+    ].join('\n');
+
+    btn.textContent = '\u26A1 Snag';
 
     btn.addEventListener('click', function () {
-      btn.innerHTML = '&#x23F3; Snagging...';
+      btn.textContent = '\u23F3 Snagging...';
       btn.disabled = true;
       btn.style.background = '#555';
       btn.style.boxShadow = 'none';
+      btn.style.transform = 'none';
 
       var jobData = extractJobData();
       console.log('[Snag] snagging:', jobData.company, '-', jobData.title);
@@ -116,70 +159,68 @@
         if (chrome.runtime.lastError) {
           console.error('[Snag] runtime error:', chrome.runtime.lastError.message);
           showToast('\u274C Extension error. Try reloading.', '#cc0000');
-          btn.innerHTML = '&#x26A1; Snag';
-          btn.style.background = '#0a66c2';
-          btn.style.boxShadow = '0 4px 18px rgba(10,102,194,0.5)';
+          btn.textContent = '\u26A1 Snag';
+          btn.style.background = '';
+          btn.style.boxShadow = '';
           btn.disabled = false;
           return;
         }
         if (response && response.success) {
-          btn.innerHTML = '&#x2705; Snagged!';
+          btn.textContent = '\u2705 Snagged!';
           btn.style.background = '#057642';
           btn.style.boxShadow = '0 4px 18px rgba(5,118,66,0.5)';
           showToast('\u2705 ' + jobData.company + ' \u2014 ' + jobData.title, '#057642');
         } else {
-          btn.innerHTML = '&#x274C; Failed';
+          btn.textContent = '\u274C Failed';
           btn.style.background = '#cc0000';
           var errMsg = (response && response.error) ? response.error : 'Check Settings.';
           showToast('\u274C ' + errMsg, '#cc0000');
         }
         setTimeout(function () {
-          btn.innerHTML = '&#x26A1; Snag';
-          btn.style.background = '#0a66c2';
-          btn.style.boxShadow = '0 4px 18px rgba(10,102,194,0.5)';
+          btn.textContent = '\u26A1 Snag';
+          btn.style.background = '';
+          btn.style.boxShadow = '';
           btn.disabled = false;
         }, 2500);
       });
     });
 
-    return btn;
+    shadow.appendChild(style);
+    shadow.appendChild(btn);
+    return host;
   }
 
   function inject() {
-    if (!document.body) return;
+    if (!document.documentElement) return;
     if (!isJobPage()) {
-      var existing = document.getElementById(BTN_ID);
+      var existing = document.getElementById(HOST_ID);
       if (existing) existing.remove();
       return;
     }
-    if (!document.getElementById(BTN_ID)) {
-      console.log('[Snag] injecting button');
-      document.body.appendChild(createButton());
+    if (!document.getElementById(HOST_ID)) {
+      console.log('[Snag] injecting button via shadow DOM');
+      document.documentElement.appendChild(createHost());
     }
   }
 
-  // Poll every 500ms for 10 seconds on initial load, then hand off to URL observer
+  // Poll every 500ms for first 10 seconds
   var pollCount = 0;
-  INTERVAL_ID = setInterval(function () {
+  var interval = setInterval(function () {
     inject();
-    pollCount++;
-    if (pollCount >= 20) {
-      clearInterval(INTERVAL_ID);
-    }
+    if (++pollCount >= 20) clearInterval(interval);
   }, 500);
 
   // Watch for SPA navigation
   var lastUrl = window.location.href;
   try {
-    var observer = new MutationObserver(function () {
+    new MutationObserver(function () {
       if (window.location.href !== lastUrl) {
         lastUrl = window.location.href;
-        console.log('[Snag] URL changed to', lastUrl);
+        console.log('[Snag] URL changed:', lastUrl);
         setTimeout(inject, 800);
         setTimeout(inject, 1800);
       }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
+    }).observe(document.documentElement, { childList: true, subtree: true });
   } catch (e) {
     console.error('[Snag] observer error:', e);
   }
