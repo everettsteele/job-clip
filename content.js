@@ -4,41 +4,43 @@
   var BTN_ID = 'snag-btn';
   var TOAST_ID = 'snag-toast';
 
+  // Show on any LinkedIn jobs page — split pane, search, collections, view
   function isJobPage() {
-    var url = window.location.href;
-    if (url.includes('linkedin.com/jobs/view/')) return true;
-    if (url.includes('linkedin.com/jobs/') &&
-        (document.querySelector('.jobs-details') ||
-         document.querySelector('.job-details-jobs-unified-top-card'))) return true;
-    return false;
+    return window.location.href.includes('linkedin.com/jobs');
   }
 
   function extractJobData() {
+    // Title: try job detail panel first, fall back to any visible h1
     var titleEl =
       document.querySelector('.job-details-jobs-unified-top-card__job-title h1') ||
       document.querySelector('.jobs-unified-top-card__job-title h1') ||
       document.querySelector('.jobs-details-top-card__job-title') ||
       document.querySelector('.t-24.t-bold.inline') ||
-      document.querySelector('.jobs-details h1') ||
       document.querySelector('.job-details h1') ||
+      document.querySelector('.jobs-details h1') ||
       document.querySelector('h1');
 
+    // Company: try anchors in the top card, then any visible company link
     var companyEl =
       document.querySelector('.job-details-jobs-unified-top-card__company-name a') ||
       document.querySelector('.jobs-unified-top-card__company-name a') ||
       document.querySelector('.jobs-unified-top-card__subtitle-primary-grouping a') ||
-      document.querySelector('[data-tracking-control-name="public_jobs_topcard-org-name"]');
+      document.querySelector('[data-tracking-control-name="public_jobs_topcard-org-name"]') ||
+      document.querySelector('.job-details-jobs-unified-top-card__company-name') ||
+      document.querySelector('.jobs-unified-top-card__company-name');
 
     var salaryEl =
       document.querySelector('.job-details-jobs-unified-top-card__salary-info') ||
       document.querySelector('.jobs-unified-top-card__salary-info') ||
-      document.querySelector('.compensation__salary');
+      document.querySelector('.compensation__salary') ||
+      document.querySelector('[class*="salary"]');
 
     var descEl =
       document.querySelector('.jobs-description__content') ||
       document.querySelector('.jobs-description-content__text') ||
       document.querySelector('#job-details') ||
-      document.querySelector('.jobs-details__main-content');
+      document.querySelector('.jobs-details__main-content') ||
+      document.querySelector('[class*="description"]');
 
     return {
       title: titleEl ? titleEl.textContent.trim() : 'Unknown Title',
@@ -91,7 +93,7 @@
       'position:fixed',
       'bottom:24px',
       'right:24px',
-      'z-index:99999',
+      'z-index:2147483647',
       'background:#0a66c2',
       'color:white',
       'border:none',
@@ -176,6 +178,10 @@
   });
 
   observer.observe(document.body, { childList: true, subtree: true });
-  setTimeout(updateVisibility, 1000);
+
+  // Initial inject — retry a few times in case page is still loading
+  setTimeout(updateVisibility, 500);
+  setTimeout(updateVisibility, 1500);
+  setTimeout(updateVisibility, 3000);
 
 })();
