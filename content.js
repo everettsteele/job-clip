@@ -11,40 +11,72 @@
   }
 
   function extractJobData() {
+    // Try every known LinkedIn title selector, most specific first
     var titleEl =
       document.querySelector('.job-details-jobs-unified-top-card__job-title h1') ||
       document.querySelector('.jobs-unified-top-card__job-title h1') ||
       document.querySelector('.jobs-details-top-card__job-title') ||
+      document.querySelector('[class*="job-title"] h1') ||
+      document.querySelector('[class*="top-card"] h1') ||
       document.querySelector('.t-24.t-bold.inline') ||
-      document.querySelector('.job-details h1') ||
       document.querySelector('.jobs-details h1') ||
       document.querySelector('h1');
 
+    // Try every known company selector
     var companyEl =
       document.querySelector('.job-details-jobs-unified-top-card__company-name a') ||
-      document.querySelector('.jobs-unified-top-card__company-name a') ||
-      document.querySelector('.jobs-unified-top-card__subtitle-primary-grouping a') ||
-      document.querySelector('[data-tracking-control-name="public_jobs_topcard-org-name"]') ||
       document.querySelector('.job-details-jobs-unified-top-card__company-name') ||
-      document.querySelector('.jobs-unified-top-card__company-name');
+      document.querySelector('.jobs-unified-top-card__company-name a') ||
+      document.querySelector('.jobs-unified-top-card__company-name') ||
+      document.querySelector('[class*="top-card"] [class*="company-name"]') ||
+      document.querySelector('[class*="top-card"] [class*="company"] a') ||
+      document.querySelector('[class*="job-details"] [class*="company"]') ||
+      document.querySelector('.jobs-unified-top-card__subtitle-primary-grouping a');
 
     var salaryEl =
       document.querySelector('.job-details-jobs-unified-top-card__salary-info') ||
       document.querySelector('.jobs-unified-top-card__salary-info') ||
-      document.querySelector('.compensation__salary');
+      document.querySelector('[class*="salary"]');
 
     var descEl =
       document.querySelector('.jobs-description__content') ||
       document.querySelector('.jobs-description-content__text') ||
       document.querySelector('#job-details') ||
-      document.querySelector('.jobs-details__main-content');
+      document.querySelector('.jobs-details__main-content') ||
+      document.querySelector('[class*="description__content"]');
+
+    // Clean extracted text — strip extra whitespace and newlines
+    function clean(el) {
+      if (!el) return null;
+      return el.textContent.replace(/\s+/g, ' ').trim();
+    }
+
+    var title = clean(titleEl) || 'Unknown Title';
+    var company = clean(companyEl) || 'Unknown Company';
+
+    // Last resort: if still unknown, try to parse from page title
+    if (title === 'Unknown Title' || company === 'Unknown Company') {
+      var pageTitle = document.title || '';
+      // LinkedIn page titles are typically "Job Title at Company | LinkedIn" or "Job Title - Company"
+      var atMatch = pageTitle.match(/^(.+?)\s+(?:at|@)\s+(.+?)\s*[|\-]/);
+      var dashMatch = pageTitle.match(/^(.+?)\s+-\s+(.+?)\s*[|\-]/);
+      if (atMatch) {
+        if (title === 'Unknown Title') title = atMatch[1].trim();
+        if (company === 'Unknown Company') company = atMatch[2].trim();
+      } else if (dashMatch) {
+        if (title === 'Unknown Title') title = dashMatch[1].trim();
+        if (company === 'Unknown Company') company = dashMatch[2].trim();
+      }
+    }
+
+    console.log('[Snag] extracted:', title, 'at', company);
 
     return {
-      title: titleEl ? titleEl.textContent.trim() : 'Unknown Title',
-      company: companyEl ? companyEl.textContent.trim() : 'Unknown Company',
-      salary: salaryEl ? salaryEl.textContent.trim() : null,
+      title: title,
+      company: company,
+      salary: clean(salaryEl),
       url: window.location.href,
-      description: descEl ? descEl.textContent.trim().substring(0, 3000) : '',
+      description: descEl ? descEl.textContent.replace(/\s+/g, ' ').trim().substring(0, 3000) : '',
       clippedAt: new Date().toISOString()
     };
   }
@@ -56,30 +88,19 @@
     var toastHost = document.createElement('div');
     toastHost.id = TOAST_ID;
     toastHost.style.cssText = [
-      'all:initial',
-      'position:fixed',
-      'bottom:90px',
-      'right:24px',
-      'z-index:2147483647',
-      'display:block'
+      'all:initial', 'position:fixed', 'bottom:90px', 'right:24px',
+      'z-index:2147483647', 'display:block'
     ].join(';');
 
     var shadow = toastHost.attachShadow({ mode: 'open' });
     var toast = document.createElement('div');
     toast.textContent = message;
     toast.style.cssText = [
-      'background:' + color,
-      'color:white',
-      'padding:10px 16px',
-      'border-radius:8px',
-      'font-size:13px',
-      'font-weight:600',
+      'background:' + color, 'color:white', 'padding:10px 16px',
+      'border-radius:8px', 'font-size:13px', 'font-weight:600',
       'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
-      'box-shadow:0 4px 16px rgba(0,0,0,0.25)',
-      'max-width:300px',
-      'white-space:nowrap',
-      'pointer-events:none',
-      'opacity:1',
+      'box-shadow:0 4px 16px rgba(0,0,0,0.25)', 'max-width:300px',
+      'white-space:nowrap', 'pointer-events:none', 'opacity:1',
       'transition:opacity 0.4s ease'
     ].join(';');
     shadow.appendChild(toast);
@@ -95,12 +116,8 @@
     var host = document.createElement('div');
     host.id = HOST_ID;
     host.style.cssText = [
-      'all:initial',
-      'position:fixed',
-      'bottom:80px',
-      'right:24px',
-      'z-index:2147483647',
-      'display:block'
+      'all:initial', 'position:fixed', 'bottom:80px', 'right:24px',
+      'z-index:2147483647', 'display:block'
     ].join(';');
 
     var shadow = host.attachShadow({ mode: 'open' });
@@ -109,30 +126,17 @@
     style.textContent = [
       '#snag-btn {',
       '  all: initial;',
-      '  display: flex;',
-      '  align-items: center;',
-      '  gap: 6px;',
-      '  background: #0a66c2;',
-      '  color: #ffffff;',
-      '  border: none;',
-      '  border-radius: 24px;',
-      '  padding: 0 22px;',
-      '  height: 46px;',
-      '  font-size: 15px;',
-      '  font-weight: 700;',
-      '  cursor: pointer;',
+      '  display: flex; align-items: center; gap: 6px;',
+      '  background: #0a66c2; color: #ffffff;',
+      '  border: none; border-radius: 24px;',
+      '  padding: 0 22px; height: 46px;',
+      '  font-size: 15px; font-weight: 700; cursor: pointer;',
       '  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;',
       '  box-shadow: 0 4px 18px rgba(10,102,194,0.5);',
-      '  letter-spacing: -0.01em;',
-      '  line-height: 1;',
-      '  white-space: nowrap;',
+      '  letter-spacing: -0.01em; line-height: 1; white-space: nowrap;',
       '  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;',
       '}',
-      '#snag-btn:hover {',
-      '  background: #004182 !important;',
-      '  transform: translateY(-2px);',
-      '  box-shadow: 0 6px 22px rgba(10,102,194,0.65);',
-      '}',
+      '#snag-btn:hover { background: #004182 !important; transform: translateY(-2px); box-shadow: 0 6px 22px rgba(10,102,194,0.65); }',
       '#snag-btn:disabled { cursor: default; }'
     ].join('\n');
 
@@ -146,7 +150,6 @@
       btn.style.cssText = 'background:#555;box-shadow:none;';
 
       var jobData = extractJobData();
-      console.log('[Snag] snagging:', jobData.company, '-', jobData.title);
 
       chrome.runtime.sendMessage({ type: 'CLIP_JOB', data: jobData }, function (response) {
         if (chrome.runtime.lastError) {
