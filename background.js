@@ -13,6 +13,13 @@ async function clipJob(job) {
       return { success: false, error: 'Not configured. Open Snag settings.' };
     }
 
+    // Deduplicate by URL — normalize to strip tracking params
+    const cleanUrl = normalizeUrl(job.url);
+    const { snaggedUrls = [] } = await chrome.storage.local.get('snaggedUrls');
+    if (snaggedUrls.includes(cleanUrl)) {
+      return { success: false, error: 'Already queued.' };
+    }
+
     const pageTitle = job.company + ' \u2014 ' + job.title;
     const dateStr = new Date(job.clippedAt).toLocaleDateString('en-US', {
       weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
@@ -79,9 +86,11 @@ async function clipJob(job) {
       return { success: false, error: err.message || 'Notion API error ' + res.status };
     }
 
-    const data = await chrome.storage.local.get('clipCount');
-    const newCount = (data.clipCount || 0) + 1;
-    await chrome.storage.local.set({ clipCount: newCount });
+    // Save URL to dedupe cache
+    snaggedUrls.push(cleanUrl);
+    const { clipCount = 0 } = await chrome.storage.local.get('clipCount');
+    const newCount = clipCount + 1;
+    await chrome.storage.local.set({ clipCount: newCount, snaggedUrls });
     chrome.action.setBadgeText({ text: String(newCount) });
     chrome.action.setBadgeBackgroundColor({ color: '#0a66c2' });
 
@@ -89,6 +98,23 @@ async function clipJob(job) {
 
   } catch (err) {
     return { success: false, error: err.message };
+  }
+}
+
+// Strip LinkedIn tracking params — keep only the job ID
+function normalizeUrl(url) {
+  try {
+    var u = new URL(url);
+    // For search-results pages, the job ID is in currentJobId param
+    var jobId = u.searchParams.get('currentJobId');
+    if (jobId) return 'linkedin-job-' + jobId;
+    // For /jobs/view/ pages, extract the ID from the path
+    var viewMatch = u.pathname.match(/\/jobs\/view\/(\d+)/);
+    if (viewMatch) return 'linkedin-job-' + viewMatch[1];
+    // Fallback: use full URL
+    return url;
+  } catch (e) {
+    return url;
   }
 }
 
