@@ -4,7 +4,7 @@
   var HOST_ID = 'snag-host';
   var TOAST_ID = 'snag-toast-host';
 
-  console.log('[Snag] content script loaded on', window.location.href);
+  console.log('[Snag] v4 loaded on', window.location.href);
 
   function isJobPage() {
     return window.location.href.includes('linkedin.com/jobs');
@@ -19,105 +19,68 @@
     var title = null;
     var company = null;
 
-    // ---- STRATEGY 1: Scan all h1s, pick first one that looks like a job title ----
-    var genericPhrases = ['jobs based on', 'top job picks', 'job search', 'linkedin', 'similar jobs'];
-    var allH1s = document.querySelectorAll('h1');
-    for (var i = 0; i < allH1s.length; i++) {
-      var h1Text = allH1s[i].textContent.replace(/\s+/g, ' ').trim();
-      if (h1Text.length < 3 || h1Text.length > 150) continue;
-      var generic = false;
-      for (var g = 0; g < genericPhrases.length; g++) {
-        if (h1Text.toLowerCase().indexOf(genericPhrases[g]) !== -1) { generic = true; break; }
-      }
-      if (!generic) { title = h1Text; break; }
+    // PRIMARY: parse document.title — most reliable on LinkedIn
+    // Format: "Chief of Staff to the CTO | Machinify | LinkedIn"
+    // Also handles: "(32) Title | Company | LinkedIn"
+    var pt = (document.title || '').replace(/^\(\d+\)\s*/, '').trim();
+    console.log('[Snag] document.title:', pt);
+
+    // Match "Title | Company | LinkedIn" — the standard LinkedIn format
+    var m = pt.match(/^(.+?)\s*\|\s*(.+?)\s*\|\s*LinkedIn\s*$/i);
+    if (m) {
+      title = m[1].trim();
+      company = m[2].trim();
+      console.log('[Snag] title from page title:', title, '|', company);
     }
 
-    // ---- STRATEGY 2: Company from known selectors ----
-    var companySelectors = [
-      '.job-details-jobs-unified-top-card__company-name a',
-      '.job-details-jobs-unified-top-card__company-name',
-      '.jobs-unified-top-card__company-name a',
-      '.jobs-unified-top-card__company-name',
-      '[class*="company-name"]',
-      '.jobs-unified-top-card__subtitle-primary-grouping a',
-      '.jobs-unified-top-card__subtitle-primary-grouping'
-    ];
-    for (var c = 0; c < companySelectors.length; c++) {
-      var el = document.querySelector(companySelectors[c]);
-      if (el) {
-        var t = clean(el).replace(/\s*[·|•·].*$/, '').trim();
-        if (t.length > 0 && t.length < 100) { company = t; break; }
-      }
-    }
-
-    // ---- STRATEGY 3: Active job card in left panel (search results split pane) ----
+    // FALLBACK A: any pipe pattern if LinkedIn suffix not present
     if (!title || !company) {
-      var activeCard =
-        document.querySelector('.job-card-container--active') ||
-        document.querySelector('[class*="job-card"][class*="active"]') ||
-        document.querySelector('[aria-selected="true"] [class*="job-card"]') ||
-        document.querySelector('li[aria-selected="true"]');
+      var m2 = pt.match(/^(.+?)\s*\|\s*(.+?)(?:\s*\|.*)?$/i);
+      if (m2) {
+        if (!title && m2[1].toLowerCase().indexOf('linkedin') === -1) title = m2[1].trim();
+        if (!company && m2[2].toLowerCase().indexOf('linkedin') === -1) company = m2[2].trim();
+      }
+    }
 
-      if (activeCard) {
+    // FALLBACK B: DOM selectors for right-panel detail view
+    if (!title) {
+      var titleEl =
+        document.querySelector('.job-details-jobs-unified-top-card__job-title h1') ||
+        document.querySelector('.jobs-unified-top-card__job-title h1') ||
+        document.querySelector('[class*="top-card"] h1') ||
+        document.querySelector('h1');
+      if (titleEl) title = clean(titleEl);
+    }
+
+    if (!company) {
+      var companyEl =
+        document.querySelector('.job-details-jobs-unified-top-card__company-name a') ||
+        document.querySelector('.job-details-jobs-unified-top-card__company-name') ||
+        document.querySelector('.jobs-unified-top-card__company-name a') ||
+        document.querySelector('.jobs-unified-top-card__company-name') ||
+        document.querySelector('[class*="company-name"]');
+      if (companyEl) company = clean(companyEl).replace(/\s*[·|•].*$/, '').trim();
+    }
+
+    // FALLBACK C: active job card in left panel
+    if (!title || !company) {
+      var card =
+        document.querySelector('.job-card-container--active') ||
+        document.querySelector('li[aria-selected="true"]');
+      if (card) {
         if (!title) {
-          var ct = activeCard.querySelector('[class*="job-title"]') ||
-                   activeCard.querySelector('a[href*="/jobs/view/"]') ||
-                   activeCard.querySelector('strong');
+          var ct = card.querySelector('[class*="job-title"]') || card.querySelector('strong');
           if (ct) title = clean(ct);
         }
         if (!company) {
-          var cc = activeCard.querySelector('[class*="primary-description"]') ||
-                   activeCard.querySelector('[class*="subtitle"]') ||
-                   activeCard.querySelector('[class*="company"]');
-          if (cc) company = clean(cc).replace(/\s*[·|•·].*$/, '').trim();
-        }
-        console.log('[Snag] active card:', title, '|', company);
-      }
-    }
-
-    // ---- STRATEGY 4: Page title parsing ----
-    // Formats: "Title at Company | LinkedIn" / "Title - Company | LinkedIn" / "(N) Title..."
-    if (!title || !company) {
-      var pt = (document.title || '').replace(/^\(\d+\)\s*/, '').trim();
-      console.log('[Snag] page title:', pt);
-
-      var patterns = [
-        /^(.+?)\s+hiring\s*\|\s*(.+?)\s*\|/i,
-        /^(.+?)\s+(?:at|@)\s+(.+?)\s*[|\u2014]/i,
-        /^(.+?)\s*-\s*(.+?)\s*\|/i,
-        /^(.+?)\s*\|\s*([^|]{2,50})\s*\|/i
-      ];
-
-      for (var p = 0; p < patterns.length; p++) {
-        var m = pt.match(patterns[p]);
-        if (m) {
-          var mt = m[1].trim();
-          var mc = m[2].trim();
-          if (mt && mt.toLowerCase().indexOf('linkedin') === -1 && !title) title = mt;
-          if (mc && mc.toLowerCase().indexOf('linkedin') === -1 && !company) company = mc;
-          if (title && company) break;
+          var cc = card.querySelector('[class*="primary-description"]') || card.querySelector('[class*="subtitle"]');
+          if (cc) company = clean(cc).replace(/\s*[·|•].*$/, '').trim();
         }
       }
     }
 
-    // ---- STRATEGY 5: og:title meta tag ----
-    if (!title || !company) {
-      var og = document.querySelector('meta[property="og:title"]');
-      if (og) {
-        var ogContent = og.getAttribute('content') || '';
-        var ogAt = ogContent.match(/^(.+?)\s+(?:at|@)\s+(.+?)(?:\s*[|\-]|$)/i);
-        if (ogAt) {
-          if (!title) title = ogAt[1].trim();
-          if (!company) company = ogAt[2].trim();
-          console.log('[Snag] og:title:', title, '|', company);
-        }
-      }
-    }
-
-    // ---- Salary & description ----
     var salaryEl =
       document.querySelector('.job-details-jobs-unified-top-card__salary-info') ||
-      document.querySelector('.jobs-unified-top-card__salary-info') ||
       document.querySelector('[class*="salary-info"]');
 
     var descEl =
@@ -135,7 +98,7 @@
       clippedAt: new Date().toISOString()
     };
 
-    console.log('[Snag] final result:', result.title, '|', result.company);
+    console.log('[Snag] final:', result.title, '|', result.company);
     return result;
   }
 
@@ -151,7 +114,11 @@
     t.style.cssText = 'background:' + color + ';color:white;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 4px 16px rgba(0,0,0,0.25);max-width:320px;white-space:nowrap;pointer-events:none;';
     sh.appendChild(t);
     document.documentElement.appendChild(host);
-    setTimeout(function () { t.style.transition = 'opacity .4s'; t.style.opacity = '0'; setTimeout(function () { if (host.parentNode) host.remove(); }, 400); }, 2800);
+    setTimeout(function () {
+      t.style.transition = 'opacity .4s';
+      t.style.opacity = '0';
+      setTimeout(function () { if (host.parentNode) host.remove(); }, 400);
+    }, 2800);
   }
 
   function createHost() {
@@ -159,14 +126,11 @@
     host.id = HOST_ID;
     host.style.cssText = 'all:initial;position:fixed;bottom:80px;right:24px;z-index:2147483647;display:block;';
     var sh = host.attachShadow({ mode: 'open' });
-
     var style = document.createElement('style');
     style.textContent = '#b{all:initial;display:flex;align-items:center;gap:6px;background:#0a66c2;color:#fff;border:none;border-radius:24px;padding:0 22px;height:46px;font-size:15px;font-weight:700;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 4px 18px rgba(10,102,194,.5);white-space:nowrap;transition:transform .15s,box-shadow .15s,background .15s}#b:hover{background:#004182!important;transform:translateY(-2px);box-shadow:0 6px 22px rgba(10,102,194,.65)}#b:disabled{cursor:default}';
-
     var btn = document.createElement('button');
     btn.id = 'b';
     btn.textContent = '\u26A1 Snag';
-
     btn.addEventListener('click', function () {
       btn.textContent = '\u23F3 Snagging...';
       btn.disabled = true;
@@ -190,7 +154,6 @@
         setTimeout(function () { btn.textContent = '\u26A1 Snag'; btn.style.cssText = ''; btn.disabled = false; }, 2500);
       });
     });
-
     sh.appendChild(style);
     sh.appendChild(btn);
     return host;
@@ -207,7 +170,6 @@
 
   var n = 0;
   var iv = setInterval(function () { inject(); if (++n >= 20) clearInterval(iv); }, 500);
-
   var lastUrl = window.location.href;
   try {
     new MutationObserver(function () {
