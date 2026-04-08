@@ -10,73 +10,130 @@
     return window.location.href.includes('linkedin.com/jobs');
   }
 
+  function clean(el) {
+    if (!el) return null;
+    return el.textContent.replace(/\s+/g, ' ').trim();
+  }
+
   function extractJobData() {
-    // Try every known LinkedIn title selector, most specific first
-    var titleEl =
-      document.querySelector('.job-details-jobs-unified-top-card__job-title h1') ||
-      document.querySelector('.jobs-unified-top-card__job-title h1') ||
-      document.querySelector('.jobs-details-top-card__job-title') ||
-      document.querySelector('[class*="job-title"] h1') ||
-      document.querySelector('[class*="top-card"] h1') ||
-      document.querySelector('.t-24.t-bold.inline') ||
-      document.querySelector('.jobs-details h1') ||
-      document.querySelector('h1');
+    var title = null;
+    var company = null;
+    var salary = null;
+    var description = null;
 
-    // Try every known company selector
-    var companyEl =
-      document.querySelector('.job-details-jobs-unified-top-card__company-name a') ||
-      document.querySelector('.job-details-jobs-unified-top-card__company-name') ||
-      document.querySelector('.jobs-unified-top-card__company-name a') ||
-      document.querySelector('.jobs-unified-top-card__company-name') ||
-      document.querySelector('[class*="top-card"] [class*="company-name"]') ||
-      document.querySelector('[class*="top-card"] [class*="company"] a') ||
-      document.querySelector('[class*="job-details"] [class*="company"]') ||
-      document.querySelector('.jobs-unified-top-card__subtitle-primary-grouping a');
-
-    var salaryEl =
-      document.querySelector('.job-details-jobs-unified-top-card__salary-info') ||
-      document.querySelector('.jobs-unified-top-card__salary-info') ||
-      document.querySelector('[class*="salary"]');
-
-    var descEl =
-      document.querySelector('.jobs-description__content') ||
-      document.querySelector('.jobs-description-content__text') ||
-      document.querySelector('#job-details') ||
-      document.querySelector('.jobs-details__main-content') ||
-      document.querySelector('[class*="description__content"]');
-
-    // Clean extracted text — strip extra whitespace and newlines
-    function clean(el) {
-      if (!el) return null;
-      return el.textContent.replace(/\s+/g, ' ').trim();
-    }
-
-    var title = clean(titleEl) || 'Unknown Title';
-    var company = clean(companyEl) || 'Unknown Company';
-
-    // Last resort: if still unknown, try to parse from page title
-    if (title === 'Unknown Title' || company === 'Unknown Company') {
-      var pageTitle = document.title || '';
-      // LinkedIn page titles are typically "Job Title at Company | LinkedIn" or "Job Title - Company"
-      var atMatch = pageTitle.match(/^(.+?)\s+(?:at|@)\s+(.+?)\s*[|\-]/);
-      var dashMatch = pageTitle.match(/^(.+?)\s+-\s+(.+?)\s*[|\-]/);
-      if (atMatch) {
-        if (title === 'Unknown Title') title = atMatch[1].trim();
-        if (company === 'Unknown Company') company = atMatch[2].trim();
-      } else if (dashMatch) {
-        if (title === 'Unknown Title') title = dashMatch[1].trim();
-        if (company === 'Unknown Company') company = dashMatch[2].trim();
+    // Strategy 1: look for h1 elements — find all, pick the one that looks like a job title
+    // Job title h1s are short (under 100 chars) and not generic navigation text
+    var allH1s = document.querySelectorAll('h1');
+    var genericPhrases = ['jobs based on', 'top job picks', 'job search', 'linkedin'];
+    for (var i = 0; i < allH1s.length; i++) {
+      var h1Text = allH1s[i].textContent.replace(/\s+/g, ' ').trim();
+      if (h1Text.length < 5 || h1Text.length > 120) continue;
+      var isGeneric = false;
+      for (var j = 0; j < genericPhrases.length; j++) {
+        if (h1Text.toLowerCase().indexOf(genericPhrases[j]) !== -1) {
+          isGeneric = true;
+          break;
+        }
+      }
+      if (!isGeneric) {
+        title = h1Text;
+        console.log('[Snag] title from h1 scan:', title);
+        break;
       }
     }
 
-    console.log('[Snag] extracted:', title, 'at', company);
+    // Strategy 2: company — look for any element with "company" in class near the title
+    var companySelectors = [
+      '.job-details-jobs-unified-top-card__company-name',
+      '.jobs-unified-top-card__company-name',
+      '[class*="company-name"]',
+      '[class*="topcard__org-name"]',
+      '.jobs-unified-top-card__subtitle-primary-grouping'
+    ];
+    for (var k = 0; k < companySelectors.length; k++) {
+      var el = document.querySelector(companySelectors[k]);
+      if (el) {
+        var text = clean(el);
+        // Strip trailing pipe characters and extra info sometimes appended
+        text = text.replace(/\s*[·|•].*$/, '').trim();
+        if (text.length > 0 && text.length < 100) {
+          company = text;
+          console.log('[Snag] company from selector:', companySelectors[k], company);
+          break;
+        }
+      }
+    }
+
+    // Strategy 3: salary
+    var salarySelectors = [
+      '.job-details-jobs-unified-top-card__salary-info',
+      '.jobs-unified-top-card__salary-info',
+      '[class*="salary"]',
+      '[class*="compensation"]'
+    ];
+    for (var s = 0; s < salarySelectors.length; s++) {
+      var sel = document.querySelector(salarySelectors[s]);
+      if (sel) {
+        salary = clean(sel);
+        break;
+      }
+    }
+
+    // Strategy 4: description
+    var descSelectors = [
+      '.jobs-description__content',
+      '.jobs-description-content__text',
+      '#job-details',
+      '.jobs-details__main-content',
+      '[class*="description__content"]',
+      '[class*="job-description"]'
+    ];
+    for (var d = 0; d < descSelectors.length; d++) {
+      var desc = document.querySelector(descSelectors[d]);
+      if (desc) {
+        description = desc.textContent.replace(/\s+/g, ' ').trim().substring(0, 3000);
+        break;
+      }
+    }
+
+    // Strategy 5: page title fallback for title AND company
+    // LinkedIn formats: "Job Title at Company | LinkedIn" or "Job Title - Company | LinkedIn"
+    if (!title || !company) {
+      var pageTitle = document.title || '';
+      console.log('[Snag] page title:', pageTitle);
+      var atMatch = pageTitle.match(/^(.+?)\s+(?:at|@)\s+(.+?)(?:\s*[|\-]|$)/);
+      var dashMatch = pageTitle.match(/^(.+?)\s+-\s+(.+?)(?:\s*[|\-]|$)/);
+      if (atMatch) {
+        if (!title) title = atMatch[1].trim();
+        if (!company) company = atMatch[2].trim();
+        console.log('[Snag] from page title (at match):', title, company);
+      } else if (dashMatch) {
+        if (!title) title = dashMatch[1].trim();
+        if (!company) company = dashMatch[2].trim();
+        console.log('[Snag] from page title (dash match):', title, company);
+      }
+    }
+
+    // Strategy 6: if company still missing, try og:title meta tag
+    if (!company) {
+      var ogTitle = document.querySelector('meta[property="og:title"]');
+      if (ogTitle) {
+        var og = ogTitle.getAttribute('content') || '';
+        var ogAt = og.match(/^(.+?)\s+(?:at|@)\s+(.+?)(?:\s*[|\-]|$)/);
+        if (ogAt) {
+          if (!title) title = ogAt[1].trim();
+          if (!company) company = ogAt[2].trim();
+          console.log('[Snag] from og:title:', title, company);
+        }
+      }
+    }
 
     return {
-      title: title,
-      company: company,
-      salary: clean(salaryEl),
+      title: title || 'Unknown Title',
+      company: company || 'Unknown Company',
+      salary: salary,
       url: window.location.href,
-      description: descEl ? descEl.textContent.replace(/\s+/g, ' ').trim().substring(0, 3000) : '',
+      description: description || '',
       clippedAt: new Date().toISOString()
     };
   }
