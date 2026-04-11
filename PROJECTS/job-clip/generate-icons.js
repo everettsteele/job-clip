@@ -11,17 +11,16 @@ sizes.forEach(size => {
   const ctx = canvas.getContext('2d');
 
   // Background circle
-  ctx.fillStyle = '#0a66c2';
+  ctx.fillStyle = '#1a1a1a';
   ctx.beginPath();
   ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
   ctx.fill();
 
-  // Paperclip letter C in white
   ctx.fillStyle = 'white';
   ctx.font = `bold ${Math.floor(size * 0.55)}px sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('J', size / 2, size / 2 + size * 0.03);
+  ctx.fillText('S', size / 2, size / 2 + size * 0.03);
 
   const buffer = canvas.toBuffer('image/png');
   fs.writeFileSync(path.join('icons', `icon${size}.png`), buffer);
