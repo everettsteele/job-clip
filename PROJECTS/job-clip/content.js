@@ -1,22 +1,22 @@
 (function () {
   'use strict';
 
-  let lastInjectedUrl = null;
+  var HOST_ID = 'snag-host';
+  var TOAST_ID = 'snag-toast-host';
 
   // ── Tier 1: JSON-LD structured data (highest confidence) ──────────
   function extractFromJsonLd() {
-    const scripts = document.querySelectorAll('script[type="application/ld+json"]');
-    for (const script of scripts) {
+    var scripts = document.querySelectorAll('script[type="application/ld+json"]');
+    for (var i = 0; i < scripts.length; i++) {
       try {
-        const data = JSON.parse(script.textContent);
-        const items = Array.isArray(data) ? data : [data];
-        for (const item of items) {
-          if (item['@type'] === 'JobPosting') {
+        var data = JSON.parse(scripts[i].textContent);
+        var items = Array.isArray(data) ? data : [data];
+        for (var j = 0; j < items.length; j++) {
+          if (items[j]['@type'] === 'JobPosting') {
             return {
-              title: item.title || '',
-              company: item.hiringOrganization?.name || '',
-              description: (item.description || '').substring(0, 3000),
-              location: item.jobLocation?.address?.addressLocality || '',
+              title: items[j].title || '',
+              company: (items[j].hiringOrganization && items[j].hiringOrganization.name) || '',
+              description: (items[j].description || '').substring(0, 3000),
               source: 'jsonld'
             };
           }
@@ -27,20 +27,7 @@
   }
 
   // ── Tier 2: Explicit DOM selectors (known sites) ──────────────────
-  const SELECTORS = {
-    'linkedin.com': {
-      title: [
-        '.job-details-jobs-unified-top-card__job-title h1',
-        '.jobs-unified-top-card__job-title h1',
-        '.t-24.t-bold.inline',
-        'h1'
-      ],
-      company: [
-        '.job-details-jobs-unified-top-card__company-name a',
-        '.jobs-unified-top-card__company-name a',
-        '.jobs-unified-top-card__subtitle-primary-grouping a'
-      ]
-    },
+  var SELECTORS = {
     'greenhouse.io': {
       title: ['h1.app-title'],
       company: ['.company-name']
@@ -79,54 +66,132 @@
     }
   };
 
+  function clean(el) {
+    if (!el) return '';
+    return el.textContent.replace(/\s+/g, ' ').trim();
+  }
+
   function getMatchedDomain() {
-    const host = location.hostname.replace(/^www\./, '');
-    for (const domain of Object.keys(SELECTORS)) {
-      if (host === domain || host.endsWith('.' + domain)) return domain;
+    var host = location.hostname.replace(/^www\./, '');
+    for (var domain in SELECTORS) {
+      if (host === domain || host.indexOf('.' + domain) === host.length - domain.length - 1) return domain;
     }
     return null;
   }
 
   function queryFirst(selectors) {
-    for (const sel of selectors) {
-      const el = document.querySelector(sel);
+    for (var i = 0; i < selectors.length; i++) {
+      var el = document.querySelector(selectors[i]);
       if (el) {
-        // For img[alt] selectors (e.g. Lever logo), use alt text
         if (el.tagName === 'IMG' && el.alt) return el.alt;
-        return el.textContent.trim();
+        return clean(el);
       }
     }
     return '';
   }
 
   function extractFromSelectors(domain) {
-    const map = SELECTORS[domain];
+    var map = SELECTORS[domain];
     if (!map) return null;
-    const title = queryFirst(map.title);
-    const company = queryFirst(map.company);
+    var title = queryFirst(map.title);
+    var company = queryFirst(map.company);
     if (!title) return null;
-    return { title, company, description: '', location: '', source: 'selector' };
+    return { title: title, company: company, description: '', source: 'selector' };
+  }
+
+  // ── LinkedIn-specific extraction (document.title is most reliable) ─
+  function isLinkedIn() {
+    return location.hostname.indexOf('linkedin.com') !== -1;
+  }
+
+  function isLinkedInJobPage() {
+    return isLinkedIn() && location.href.indexOf('/jobs/') !== -1;
+  }
+
+  function extractFromLinkedIn() {
+    var title = null;
+    var company = null;
+
+    // PRIMARY: parse document.title — most reliable on LinkedIn
+    // Format: "Chief of Staff to the CTO | Machinify | LinkedIn"
+    // Also handles: "(32) Title | Company | LinkedIn"
+    var pt = (document.title || '').replace(/^\(\d+\)\s*/, '').trim();
+
+    var m = pt.match(/^(.+?)\s*\|\s*(.+?)\s*\|\s*LinkedIn\s*$/i);
+    if (m) {
+      title = m[1].trim();
+      company = m[2].trim();
+    }
+
+    // FALLBACK A: any pipe pattern
+    if (!title || !company) {
+      var m2 = pt.match(/^(.+?)\s*\|\s*(.+?)(?:\s*\|.*)?$/i);
+      if (m2) {
+        if (!title && m2[1].toLowerCase().indexOf('linkedin') === -1) title = m2[1].trim();
+        if (!company && m2[2].toLowerCase().indexOf('linkedin') === -1) company = m2[2].trim();
+      }
+    }
+
+    // FALLBACK B: DOM selectors
+    if (!title) {
+      var titleEl =
+        document.querySelector('.job-details-jobs-unified-top-card__job-title h1') ||
+        document.querySelector('.jobs-unified-top-card__job-title h1') ||
+        document.querySelector('[class*="top-card"] h1') ||
+        document.querySelector('h1');
+      if (titleEl) title = clean(titleEl);
+    }
+
+    if (!company) {
+      var companyEl =
+        document.querySelector('.job-details-jobs-unified-top-card__company-name a') ||
+        document.querySelector('.job-details-jobs-unified-top-card__company-name') ||
+        document.querySelector('.jobs-unified-top-card__company-name a') ||
+        document.querySelector('.jobs-unified-top-card__company-name') ||
+        document.querySelector('[class*="company-name"]');
+      if (companyEl) company = clean(companyEl).replace(/\s*[·|•].*$/, '').trim();
+    }
+
+    // FALLBACK C: active job card in left panel
+    if (!title || !company) {
+      var card =
+        document.querySelector('.job-card-container--active') ||
+        document.querySelector('li[aria-selected="true"]');
+      if (card) {
+        if (!title) {
+          var ct = card.querySelector('[class*="job-title"]') || card.querySelector('strong');
+          if (ct) title = clean(ct);
+        }
+        if (!company) {
+          var cc = card.querySelector('[class*="primary-description"]') || card.querySelector('[class*="subtitle"]');
+          if (cc) company = clean(cc).replace(/\s*[·|•].*$/, '').trim();
+        }
+      }
+    }
+
+    if (!title) return null;
+    return { title: title, company: company || 'Unknown Company', description: '', source: 'linkedin' };
   }
 
   // ── Tier 3: Heuristic detection (unknown sites) ───────────────────
   function scorePageAsJobPosting() {
-    let score = 0;
-    const url = location.href.toLowerCase();
-    const jobPaths = ['/jobs/', '/careers/', '/position/', '/opening/', '/vacancy/'];
-    for (const p of jobPaths) {
-      if (url.includes(p)) { score += 2; break; }
+    var score = 0;
+    var url = location.href.toLowerCase();
+    var jobPaths = ['/jobs/', '/careers/', '/position/', '/opening/', '/vacancy/'];
+    for (var i = 0; i < jobPaths.length; i++) {
+      if (url.indexOf(jobPaths[i]) !== -1) { score += 2; break; }
     }
 
-    const buttons = document.querySelectorAll('button, a[role="button"], input[type="submit"]');
-    const applyPatterns = /apply\s*(now|for\s*this|here)?|submit\s*application/i;
-    for (const btn of buttons) {
-      if (applyPatterns.test(btn.textContent)) { score += 3; break; }
+    var buttons = document.querySelectorAll('button, a[role="button"], input[type="submit"]');
+    var applyPatterns = /apply\s*(now|for\s*this|here)?|submit\s*application/i;
+    for (var j = 0; j < buttons.length; j++) {
+      if (applyPatterns.test(buttons[j].textContent)) { score += 3; break; }
     }
 
-    const text = document.body?.innerText || '';
-    const sections = ['responsibilities', 'requirements', 'qualifications'];
-    for (const s of sections) {
-      if (text.toLowerCase().includes(s)) score += 2;
+    var text = (document.body && document.body.innerText) || '';
+    var sections = ['responsibilities', 'requirements', 'qualifications'];
+    for (var k = 0; k < sections.length; k++) {
+      if (text.toLowerCase().indexOf(sections[k]) !== -1) score += 2;
     }
 
     if (/salary|compensation|\$\d{2,3}[,kK]/i.test(text)) score += 1;
@@ -135,250 +200,170 @@
   }
 
   function extractFromHeuristics() {
-    const h1 = document.querySelector('h1');
-    const title = h1?.textContent?.trim() || '';
-    // Try to get company from meta tags or og:site_name
-    const ogSite = document.querySelector('meta[property="og:site_name"]');
-    const company = ogSite?.content || location.hostname.replace(/^www\./, '').split('.')[0] || '';
-    return { title, company, description: '', location: '', source: 'heuristic' };
+    var h1 = document.querySelector('h1');
+    var title = h1 ? clean(h1) : '';
+    var ogSite = document.querySelector('meta[property="og:site_name"]');
+    var company = (ogSite && ogSite.content) || location.hostname.replace(/^www\./, '').split('.')[0] || '';
+    return { title: title, company: company, description: '', source: 'heuristic' };
   }
 
   // ── Detection orchestration ───────────────────────────────────────
   function detectJob() {
+    // LinkedIn gets its own path
+    if (isLinkedIn()) {
+      if (!isLinkedInJobPage()) return null;
+      // Still try JSON-LD first
+      var jsonLd = extractFromJsonLd();
+      if (jsonLd && jsonLd.title) return jsonLd;
+      return extractFromLinkedIn();
+    }
+
     // Tier 1: JSON-LD
-    const jsonLd = extractFromJsonLd();
-    if (jsonLd && jsonLd.title) return { tier: 1, data: jsonLd };
+    var jsonLdResult = extractFromJsonLd();
+    if (jsonLdResult && jsonLdResult.title) return jsonLdResult;
 
     // Tier 2: Known site selectors
-    const domain = getMatchedDomain();
+    var domain = getMatchedDomain();
     if (domain) {
-      const sel = extractFromSelectors(domain);
-      if (sel && sel.title) return { tier: 2, data: sel };
+      var sel = extractFromSelectors(domain);
+      if (sel && sel.title) return sel;
     }
 
     // Tier 3: Heuristic
-    const score = scorePageAsJobPosting();
+    var score = scorePageAsJobPosting();
     if (score >= 5) {
-      const heur = extractFromHeuristics();
-      if (heur.title) return { tier: 3, data: heur };
+      var heur = extractFromHeuristics();
+      if (heur.title) return heur;
     }
 
     return null;
   }
 
-  // ── Get job description text ──────────────────────────────────────
+  // ── Get description text ──────────────────────────────────────────
   function getDescription() {
-    const descSelectors = [
+    var descSelectors = [
       '.jobs-description__content',
       '.jobs-description-content__text',
       '#job-details',
+      '.jobs-details__main-content',
       '.job-description',
       '.posting-page .content',
       '[data-qa="job-description"]',
       '.jv-job-detail-description'
     ];
-    for (const sel of descSelectors) {
-      const el = document.querySelector(sel);
-      if (el) return el.textContent.trim().substring(0, 3000);
+    for (var i = 0; i < descSelectors.length; i++) {
+      var el = document.querySelector(descSelectors[i]);
+      if (el) return el.textContent.replace(/\s+/g, ' ').trim().substring(0, 3000);
     }
     return '';
   }
 
-  // ── Snag button UI ────────────────────────────────────────────────
-  function createSnagButton(tier, jobData) {
-    const existing = document.getElementById('snag-btn');
+  // ── Toast notification ────────────────────────────────────────────
+  function showToast(message, color) {
+    var existing = document.getElementById(TOAST_ID);
     if (existing) existing.remove();
-
-    const isFloating = tier === 3;
-
-    const btn = document.createElement('button');
-    btn.id = 'snag-btn';
-
-    if (isFloating) {
-      btn.textContent = 'Snag this job?';
-      btn.style.cssText = [
-        'position:fixed', 'bottom:24px', 'right:24px', 'z-index:999999',
-        'padding:10px 18px', 'background:#1a1a1a', 'color:white',
-        'border:none', 'border-radius:24px', 'font-size:13px',
-        'font-weight:600', 'cursor:pointer', 'box-shadow:0 2px 12px rgba(0,0,0,0.25)',
-        'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
-        'transition:all 0.15s ease'
-      ].join(';');
-    } else {
-      btn.textContent = '\u26A1 Snag';
-      btn.style.cssText = [
-        'margin-left:8px', 'padding:8px 16px',
-        'background:#1a1a1a', 'color:white',
-        'border:none', 'border-radius:20px', 'font-size:14px',
-        'font-weight:600', 'cursor:pointer',
-        'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'
-      ].join(';');
-    }
-
-    btn.addEventListener('mouseenter', () => { btn.style.background = '#333'; });
-    btn.addEventListener('mouseleave', () => { btn.style.background = '#1a1a1a'; });
-
-    let confirmed = !isFloating; // Tier 1/2 skip confirmation
-
-    btn.addEventListener('click', async () => {
-      if (isFloating && !confirmed) {
-        // Show confirmation with editable fields
-        confirmed = true;
-        btn.innerHTML = '';
-        btn.style.cssText = [
-          'position:fixed', 'bottom:24px', 'right:24px', 'z-index:999999',
-          'padding:16px', 'background:#1a1a1a', 'color:white',
-          'border:none', 'border-radius:12px', 'font-size:13px',
-          'cursor:default', 'box-shadow:0 2px 12px rgba(0,0,0,0.25)',
-          'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
-          'display:flex', 'flex-direction:column', 'gap:8px', 'min-width:240px'
-        ].join(';');
-
-        const makeInput = (label, value) => {
-          const wrap = document.createElement('div');
-          const lbl = document.createElement('div');
-          lbl.textContent = label;
-          lbl.style.cssText = 'font-size:11px;color:#888;margin-bottom:2px;';
-          const inp = document.createElement('input');
-          inp.value = value;
-          inp.style.cssText = 'width:100%;padding:6px 8px;border:1px solid #444;border-radius:6px;background:#222;color:white;font-size:13px;box-sizing:border-box;';
-          wrap.appendChild(lbl);
-          wrap.appendChild(inp);
-          return { wrap, inp };
-        };
-
-        const titleField = makeInput('Title', jobData.title);
-        const companyField = makeInput('Company', jobData.company);
-
-        const confirmBtn = document.createElement('button');
-        confirmBtn.textContent = '\u26A1 Snag it';
-        confirmBtn.style.cssText = 'padding:8px;background:#057642;color:white;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px;';
-
-        btn.appendChild(titleField.wrap);
-        btn.appendChild(companyField.wrap);
-        btn.appendChild(confirmBtn);
-
-        confirmBtn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          jobData.title = titleField.inp.value.trim() || jobData.title;
-          jobData.company = companyField.inp.value.trim() || jobData.company;
-          await doSnag(btn, jobData, true);
-        });
-        return;
-      }
-
-      await doSnag(btn, jobData, isFloating);
-    });
-
-    return btn;
+    var host = document.createElement('div');
+    host.id = TOAST_ID;
+    host.style.cssText = 'all:initial;position:fixed;bottom:90px;right:24px;z-index:2147483647;display:block;';
+    var sh = host.attachShadow({ mode: 'open' });
+    var t = document.createElement('div');
+    t.textContent = message;
+    t.style.cssText = 'background:' + color + ';color:white;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 4px 16px rgba(0,0,0,0.25);max-width:320px;white-space:nowrap;pointer-events:none;';
+    sh.appendChild(t);
+    document.documentElement.appendChild(host);
+    setTimeout(function () {
+      t.style.transition = 'opacity .4s';
+      t.style.opacity = '0';
+      setTimeout(function () { if (host.parentNode) host.remove(); }, 400);
+    }, 2800);
   }
 
-  async function doSnag(btn, jobData, isFloating) {
-    if (isFloating) {
-      btn.innerHTML = '';
-      btn.style.cssText = [
-        'position:fixed', 'bottom:24px', 'right:24px', 'z-index:999999',
-        'padding:10px 18px', 'background:#555', 'color:white',
-        'border:none', 'border-radius:24px', 'font-size:13px',
-        'font-weight:600', 'cursor:default', 'box-shadow:0 2px 12px rgba(0,0,0,0.25)',
-        'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'
-      ].join(';');
-      btn.textContent = '\u23F3 Snagging...';
-    } else {
+  // ── Snag button (Shadow DOM to survive LinkedIn CSS) ──────────────
+  function createHost(jobData) {
+    var host = document.createElement('div');
+    host.id = HOST_ID;
+    host.style.cssText = 'all:initial;position:fixed;bottom:80px;right:24px;z-index:2147483647;display:block;';
+    var sh = host.attachShadow({ mode: 'open' });
+    var style = document.createElement('style');
+    style.textContent = '#b{all:initial;display:flex;align-items:center;gap:6px;background:#1a1a1a;color:#fff;border:none;border-radius:24px;padding:0 22px;height:46px;font-size:15px;font-weight:700;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 4px 18px rgba(0,0,0,.35);white-space:nowrap;transition:transform .15s,box-shadow .15s,background .15s}#b:hover{background:#333!important;transform:translateY(-2px);box-shadow:0 6px 22px rgba(0,0,0,.5)}#b:disabled{cursor:default}';
+    var btn = document.createElement('button');
+    btn.id = 'b';
+    btn.textContent = '\u26A1 Snag';
+
+    btn.addEventListener('click', function () {
       btn.textContent = '\u23F3 Snagging...';
       btn.disabled = true;
-    }
+      btn.style.cssText = 'background:#555;box-shadow:none;';
 
-    const desc = jobData.description || getDescription();
-    const payload = {
-      company: jobData.company,
-      role: jobData.title,
-      source_url: location.href,
-      description: desc,
-      location: jobData.location || ''
-    };
+      // Re-detect to get freshest data
+      var fresh = detectJob();
+      var data = fresh || jobData;
+      var desc = getDescription();
 
-    const response = await chrome.runtime.sendMessage({ type: 'SNAG_JOB', data: payload });
+      var payload = {
+        company: data.company || 'Unknown Company',
+        role: data.title || 'Unknown Title',
+        source_url: location.href,
+        description: desc
+      };
 
-    if (response.success) {
-      btn.innerHTML = '';
-      btn.textContent = '\u2705 Snagged!';
-      btn.style.background = '#057642';
-      if (!isFloating) btn.disabled = true;
-      setTimeout(() => { btn.remove(); }, 2500);
-    } else {
-      btn.innerHTML = '';
-      btn.textContent = '\u274C Failed';
-      btn.style.background = '#cc0000';
-      console.error('Snag error:', response.error);
-      setTimeout(() => {
-        btn.textContent = isFloating ? 'Snag this job?' : '\u26A1 Snag';
-        btn.style.background = '#1a1a1a';
-        if (!isFloating) btn.disabled = false;
-      }, 2500);
-    }
-  }
-
-  // ── Injection logic ───────────────────────────────────────────────
-  function tryInject() {
-    const currentUrl = location.href;
-    if (lastInjectedUrl === currentUrl && document.getElementById('snag-btn')) return;
-
-    const result = detectJob();
-    if (!result) return;
-
-    const btn = createSnagButton(result.tier, result.data);
-
-    if (result.tier === 3) {
-      // Floating badge — append to body
-      document.body.appendChild(btn);
-    } else {
-      // Try to place inline near an apply button
-      const containers = [
-        '.jobs-apply-button--top-card',
-        '.job-details-jobs-unified-top-card__container--two-pane',
-        '.jobs-unified-top-card__content--two-pane .mt4',
-        '.jobs-s-apply',
-        '.posting-btn-submit',
-        '.postings-btn',
-        '[data-qa="apply-button"]'
-      ];
-      const container = document.querySelector(containers.join(','));
-      if (container) {
-        const applyBtn = container.querySelector('button, a');
-        if (applyBtn) {
-          applyBtn.insertAdjacentElement('afterend', btn);
-        } else {
-          container.appendChild(btn);
+      chrome.runtime.sendMessage({ type: 'SNAG_JOB', data: payload }, function (response) {
+        if (chrome.runtime.lastError) {
+          showToast('\u274C ' + chrome.runtime.lastError.message, '#cc0000');
+          btn.textContent = '\u26A1 Snag'; btn.style.cssText = ''; btn.disabled = false;
+          return;
         }
-      } else {
-        // Fall back to floating if no container found
-        btn.style.cssText = [
-          'position:fixed', 'bottom:24px', 'right:24px', 'z-index:999999',
-          'padding:10px 18px', 'background:#1a1a1a', 'color:white',
-          'border:none', 'border-radius:24px', 'font-size:13px',
-          'font-weight:600', 'cursor:pointer', 'box-shadow:0 2px 12px rgba(0,0,0,0.25)',
-          'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'
-        ].join(';');
-        document.body.appendChild(btn);
-      }
-    }
+        if (response && response.success) {
+          btn.textContent = '\u2705 Snagged!';
+          btn.style.cssText = 'background:#057642;box-shadow:0 4px 18px rgba(5,118,66,.5);';
+          showToast('\u2705 ' + payload.company + ' \u2014 ' + payload.role, '#057642');
+        } else {
+          btn.textContent = '\u274C Failed';
+          btn.style.cssText = 'background:#cc0000;';
+          showToast('\u274C ' + ((response && response.error) || 'Check Settings.'), '#cc0000');
+        }
+        setTimeout(function () { btn.textContent = '\u26A1 Snag'; btn.style.cssText = ''; btn.disabled = false; }, 2500);
+      });
+    });
 
-    lastInjectedUrl = currentUrl;
+    sh.appendChild(style);
+    sh.appendChild(btn);
+    return host;
   }
 
-  // ── SPA navigation watcher ────────────────────────────────────────
-  let lastUrl = location.href;
-  const observer = new MutationObserver(() => {
-    if (location.href !== lastUrl) {
-      lastUrl = location.href;
-      lastInjectedUrl = null;
-      setTimeout(tryInject, 1200);
-    } else if (!document.getElementById('snag-btn')) {
-      tryInject();
-    }
-  });
+  // ── Injection ─────────────────────────────────────────────────────
+  function inject() {
+    if (!document.documentElement) return;
 
-  observer.observe(document.body, { childList: true, subtree: true });
-  setTimeout(tryInject, 1500);
+    var result = detectJob();
+    if (!result) {
+      // No job detected — remove button if present
+      var e = document.getElementById(HOST_ID);
+      if (e) e.remove();
+      return;
+    }
+
+    if (!document.getElementById(HOST_ID)) {
+      document.documentElement.appendChild(createHost(result));
+    }
+  }
+
+  // Poll for injection (handles SPA loading delays)
+  var n = 0;
+  var iv = setInterval(function () { inject(); if (++n >= 20) clearInterval(iv); }, 500);
+
+  // Watch for SPA navigation
+  var lastUrl = location.href;
+  try {
+    new MutationObserver(function () {
+      if (location.href !== lastUrl) {
+        lastUrl = location.href;
+        // Remove old button on navigation
+        var e = document.getElementById(HOST_ID);
+        if (e) e.remove();
+        n = 0;
+        iv = setInterval(function () { inject(); if (++n >= 20) clearInterval(iv); }, 500);
+      }
+    }).observe(document.documentElement, { childList: true, subtree: true });
+  } catch (e) {}
 })();
