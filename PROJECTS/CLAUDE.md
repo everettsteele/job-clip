@@ -6,17 +6,20 @@ These rules apply to all Meridian projects under the parent company **neverstill
 
 Meridian's flagship product is **Merkava** — a business-intelligence cockpit for operators running one business or twenty. Modular capabilities called **Drives** (content, support, CRM, HR, ATS, SEO, ads, compliance, onboarding, etc.) plug into one cockpit through a signed HMAC protocol called the Meridian Platform Contract. The AI engine underneath is **Forge**.
 
+**Cockpit (single source of truth):** `~/PROJECTS/merkava-hq/MERKAVA.md` is the always-loaded index. Read it before any cross-cutting Merkava work — it covers brand non-negotiables, ICP + voice thesis, vendor stack ("no new services"), repo map, and the read/write protocol. Domain detail (Drives, Forge contract, marketing ops, initiatives, integrations, deploy runbooks, decisions) lives in `merkava-hq/domains/`.
+
 When you touch any repo in the ecosystem, read that repo's `CLAUDE.md` first:
 
 | Repo | Path | Role |
 |---|---|---|
+| **merkava-hq** | `/Users/everettsteele/PROJECTS/merkava-hq` | Cockpit — brand canon, ops, integrations, decisions log |
 | **emmett** | `/Users/everettsteele/PROJECTS/emmett` | Merkava Core — the cockpit + all first-party Drives + Forge + Platform Contract |
 | **withmerkava** | `/Users/everettsteele/PROJECTS/withmerkava` | Public marketing site at withmerkava.com (Cloudflare Pages) |
 | **quillsly** | `/Users/everettsteele/PROJECTS/quillsly` | Content Drive — standalone product at quillsly.com + mounts inside Merkava |
 | **relay** | `/Users/everettsteele/PROJECTS/relay` | Support Drive — embedded chat widget, separate Railway deploy |
 | **centerlineos** | `/Users/everettsteele/PROJECTS/centerlineos` | Operating-cadence Drive — external, runs as its own SaaS |
 
-**Each repo has its own `CLAUDE.md`** with repo-specific conventions (Drive roster, event catalog, UI shell rules, deploy flow). Those files are the single source of truth — update them when you change the system.
+**Each repo has its own `CLAUDE.md`** with repo-specific conventions (Drive roster, event catalog, UI shell rules, deploy flow). Those files are the single source of truth for repo-specific detail. The cockpit (`merkava-hq/`) owns cross-cutting context — update both when you change the system.
 
 ## Merkava brand non-negotiables (apply across every repo)
 
