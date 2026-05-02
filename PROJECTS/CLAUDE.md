@@ -4,7 +4,7 @@ These rules apply to all Meridian projects under the parent company **neverstill
 
 ## The Merkava ecosystem — read this first
 
-Meridian's flagship product is **Merkava** — a business-intelligence cockpit for operators running one business or twenty. Modular capabilities called **Drives** (content, support, CRM, HR, ATS, SEO, ads, compliance, onboarding, etc.) plug into one cockpit through a signed HMAC protocol called the Meridian Platform Contract. The AI engine underneath is **Forge**.
+Meridian's flagship product is **Merkava** — a business-intelligence cockpit that hires AI executives against the work an early-stage operator would otherwise have to do alone. Modular capabilities called **Drives** (content, support, CRM, HR, ATS, SEO, ads, compliance, onboarding, etc.) plug into one cockpit through a signed HMAC protocol called the Meridian Platform Contract. The AI engine underneath is **Forge**. ICP canon: `merkava-hq/MERKAVA.md §2` — operators who haven't taken the raise, need C-suite muscle without C-suite payroll. Do **not** carry forward "running one business or twenty" / "portfolio operator" / "holdco" / "5–40 P&Ls" framing; that's stale wedge language from a prior pivot.
 
 **Cockpit (single source of truth):** `~/PROJECTS/merkava-hq/MERKAVA.md` is the always-loaded index. Read it before any cross-cutting Merkava work — it covers brand non-negotiables, ICP + voice thesis, vendor stack ("no new services"), repo map, and the read/write protocol. Domain detail (Drives, Forge contract, marketing ops, initiatives, integrations, deploy runbooks, decisions) lives in `merkava-hq/domains/`.
 
