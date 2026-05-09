@@ -13,7 +13,7 @@ When you touch any repo in the ecosystem, read that repo's `CLAUDE.md` first:
 | Repo | Path | Role |
 |---|---|---|
 | **merkava-hq** | `/Users/everettsteele/PROJECTS/merkava-hq` | Cockpit — brand canon, ops, integrations, decisions log |
-| **emmett** | `/Users/everettsteele/PROJECTS/emmett` | Merkava Core — the cockpit + all first-party Drives + Forge + Platform Contract |
+| **merkava** | `/Users/everettsteele/PROJECTS/emmett` | Merkava Core — the cockpit + all first-party Drives + Forge + Platform Contract. Local dir name `emmett` is a legacy artifact; the repo + venture id + brand are all Merkava. |
 | **withmerkava** | `/Users/everettsteele/PROJECTS/withmerkava` | Public marketing site at withmerkava.com (Cloudflare Pages) |
 | **quillsly** | `/Users/everettsteele/PROJECTS/quillsly` | Content Drive — standalone product at quillsly.com + mounts inside Merkava |
 | **relay** | `/Users/everettsteele/PROJECTS/relay` | Support Drive — embedded chat widget, separate Railway deploy |
