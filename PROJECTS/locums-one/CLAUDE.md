@@ -5,7 +5,7 @@ Healthcare recruiting venture (locum tenens staffing). Early exploration phase â
 ## Status
 
 - **Phase:** Discovery. Reading inbound documents, building understanding of the locums market, contracts, and economics.
-- **Parent:** Meridian (neverstill.llc), same as all PROJECTS ventures.
+- **Parent:** Meridian (the venture studio; MeridianBaseHQ.com), same as all PROJECTS ventures.
 
 ## Layout
 
