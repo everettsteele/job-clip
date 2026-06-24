@@ -1,6 +1,6 @@
 # Meridian Global Rules
 
-These rules apply to all Meridian projects under the parent company **neverstill.llc**.
+These rules apply to all **Meridian** projects. Meridian is the venture studio (site: **MeridianBaseHQ.com**) that runs Merkava and the other ventures here — it is the top-level company; do not name a parent above it. **neverstill.llc is unrelated**: it is Everett Steele's personal brand/site only, never Meridian's parent, URL, or holding company. Never reference neverstill.llc in relation to Meridian, Merkava, or any holdings.
 
 ## The Merkava ecosystem — read this first
 
@@ -54,4 +54,4 @@ Before starting any work, read the project's `PROMPTS/` folder to understand wha
 
 ## Architecture Philosophy
 
-All projects belong to Meridian (parent company: neverstill.llc). When in doubt about architecture, keep it **simple and surgical**.
+All projects belong to Meridian (the venture studio; MeridianBaseHQ.com). When in doubt about architecture, keep it **simple and surgical**.
