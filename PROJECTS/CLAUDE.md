@@ -44,6 +44,12 @@ Never commit:
 - Database files (`.db`)
 - `node_modules`
 
+## Definition of done — Relay KB sync (Merkava ecosystem)
+
+**When you ship major work that changes a customer-facing product claim, syncing the Relay support-bot KB is part of closing out — do it automatically, without being asked.** "Major work / product claim" = a new or changed Drive, a pricing/packaging change, a brand-lexicon or Drive-roster change, a Platform Contract change, **or a new customer-facing program or page** (e.g. a new landing page like Founding Operators). Typo/CSS/layout-only edits do **not** qualify.
+
+The KB is URL-sourced from `emmett/docs/customer-docs/**` (served at `app.withmerkava.com/docs/api/all.json`). Close-out steps: (1) edit the relevant customer-docs so the new claim is represented, (2) deploy emmett so the URL is live, (3) re-ingest from the relay repo: `MERIDIAN_AGENT_SECRET="…" node bin/sync-kb.js merkava` (secret lives on the Relay Railway service — ask inline if you don't have it). Full protocol: `emmett/CLAUDE.md` + `relay/CLAUDE.md` ("Relay as Merkava's support surface"). If a deploy is gated (e.g. the overnight promote cadence), queue the KB sync to ride the same train and **say so in the close-out summary** — never silently skip it.
+
 ## Project Orientation
 
 Before starting any work, read the project's `PROMPTS/` folder to understand what has already been built. If the project does not have a `PROMPTS/` folder, create one.
